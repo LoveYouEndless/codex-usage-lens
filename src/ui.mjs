@@ -21,7 +21,7 @@ export function removeLens() {
 }
 
 export function installLens(payload) {
-  const VERSION = '0.1.1';
+  const VERSION = '0.1.2';
   const KEY = '__codexUsageLens';
   const ATTR = 'data-usage-lens';
   const active = () => {
@@ -78,6 +78,7 @@ export function installLens(payload) {
   let timer = null;
   let destroyed = false;
   let data = payload;
+  const replyHosts = new Set();
   const format = value => {
     if (value == null) return '\u2014';
     const scale = unit === 'K' ? 1000 : unit === 'M' ? 1000000
@@ -106,13 +107,19 @@ export function installLens(payload) {
     .ul-row{display:flex;align-items:center;gap:8px;max-width:100%;margin:4px 0 8px;min-height:26px}
     .ul-row.ul-inline{flex:0 0 auto;margin:0 6px;min-height:22px}
     .ul-row.ul-inline .ul-button{min-height:22px;padding:2px 7px;font-size:11px}
+    .ul-row.ul-contextual{opacity:0;pointer-events:none}
+    [data-usage-lens-reply]:hover .ul-contextual,
+    [data-usage-lens-reply]:focus-within .ul-contextual,
+    .ul-row.ul-contextual:has(.ul-button[aria-expanded=true]){opacity:1;pointer-events:auto}
     .ul-button,.ul-dialog,.ul-meter{--ul-bg:#fff;--ul-fg:#222;--ul-sub:#707070;--ul-border:#dedede;
       color:var(--ul-fg);font:12px/1.45 system-ui,sans-serif;letter-spacing:0;box-sizing:border-box}
     .ul-dark{--ul-bg:#242424;--ul-fg:#f3f3f3;--ul-sub:#b0b0b0;--ul-border:#494949}
-    .ul-row .ul-button{display:inline-flex;align-items:center;gap:7px;min-height:26px;padding:3px 9px;
-      border:1px solid var(--ul-border);border-radius:5px;background:var(--ul-bg);cursor:pointer;
+    .ul-row .ul-button{display:inline-flex;align-items:center;gap:5px;min-height:26px;padding:3px 9px;
+      color:var(--ul-action-fg,var(--ul-sub));border:0;border-radius:5px;background:transparent;cursor:pointer;
       white-space:nowrap;max-width:100%;box-shadow:none;flex-wrap:wrap;font-variant-numeric:tabular-nums}
-    .ul-button:hover{filter:brightness(.96)}.ul-dark.ul-button:hover{filter:brightness(1.2)}
+    .ul-row .ul-button:hover,.ul-row .ul-button[aria-expanded=true]{background:#f0f1f2}
+    .ul-row .ul-dark.ul-button:hover,.ul-row .ul-dark.ul-button[aria-expanded=true]{background:#353535}
+    .ul-button svg{width:14px;height:14px;flex:0 0 14px}
     .ul-button:focus-visible,.ul-dialog button:focus-visible{outline:2px solid #348b69;outline-offset:2px}
     .ul-dialog{position:fixed;z-index:2147483001;width:310px;max-width:calc(100vw - 24px);
       max-height:calc(100vh - 24px);overflow:auto;background:var(--ul-bg);border:1px solid var(--ul-border);
@@ -165,7 +172,10 @@ export function installLens(payload) {
     dialog.style.left = `${left}px`;
     dialog.style.top = `${Math.max(12, Math.min(top, innerHeight - height - 12))}px`;
   };
-  const close = () => { dialog.hidden = true; selected = null; selectedSession = null; anchor = null; dialogSignature = null; };
+  const close = () => {
+    anchor?.setAttribute('aria-expanded', 'false');
+    dialog.hidden = true; selected = null; selectedSession = null; anchor = null; dialogSignature = null;
+  };
   function renderDialog() {
     const session = selectedSession || data?.session;
     const usage = selected?.usage || session?.total;
@@ -260,6 +270,7 @@ export function installLens(payload) {
     selectedSession = session;
     renderDialog();
     dialog.hidden = false;
+    button.setAttribute('aria-expanded', 'true');
     place();
   }
   function paintMeter() {
@@ -286,6 +297,8 @@ export function installLens(payload) {
     const id = active();
     if (!session || session.id !== id) {
       document.querySelectorAll('.ul-row[data-usage-lens]').forEach(node => node.remove());
+      for (const host of replyHosts) host.removeAttribute('data-usage-lens-reply');
+      replyHosts.clear();
       close();
       paintMeter();
       return;
@@ -300,6 +313,7 @@ export function installLens(payload) {
     const hosts = Array.from(document.querySelectorAll('[data-response-annotation-target][data-response-annotation-conversation]'));
     const used = new Set();
     const kept = new Set();
+    const keptHosts = new Set();
     for (const host of hosts) {
       const conversation = host.getAttribute('data-response-annotation-conversation')?.replace(/^local:/, '');
       if (conversation !== session.id) continue;
@@ -315,17 +329,35 @@ export function installLens(payload) {
         actionRow.insertAdjacentElement('afterend', row);
       }
       kept.add(row);
+      host.setAttribute('data-usage-lens-reply', '');
+      keptHosts.add(host);
+      replyHosts.add(host);
       let button = row.querySelector('button');
-      if (!button) { button = make('button', 'ul-button'); button.type = 'button'; row.append(button); }
+      if (!button) {
+        button = make('button', 'ul-button');
+        button.type = 'button';
+        // Lucide database icon; see THIRD_PARTY_NOTICES.md.
+        button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>';
+        button.append(make('span', 'ul-caption'));
+        row.append(button);
+      }
       const caption = `${t('usage')} ${format(turn.usage.total)} tok`;
-      if (button.textContent !== caption) button.textContent = caption;
+      const label = button.querySelector('.ul-caption');
+      if (label.textContent !== caption) label.textContent = caption;
       button.title = `${t('turn')}: ${new Intl.NumberFormat().format(turn.usage.total)} tok`;
       button.setAttribute('aria-haspopup', 'dialog');
+      button.setAttribute('aria-expanded', String(!dialog.hidden && anchor === button));
       button.setAttribute('data-usage-lens-turn', turn.id);
       button.onclick = () => open(button, turn, session);
       theme(button);
       const actionStyle = getComputedStyle(actionRow);
       const nativeChildren = Array.from(actionRow.children).filter(node => node !== row);
+      const nativeControls = nativeChildren.find(node => node.querySelector('button'));
+      const nativeButton = nativeControls?.querySelector('button');
+      row.classList.toggle('ul-contextual', nativeControls
+        ? nativeControls.classList.contains('opacity-0')
+        : turn.id !== session.turns.at(-1)?.id);
+      if (nativeButton) button.style.setProperty('--ul-action-fg', getComputedStyle(nativeButton).color);
       const nativeWidth = nativeChildren.reduce((sum, node) => {
         const style = getComputedStyle(node);
         return sum + node.getBoundingClientRect().width
@@ -343,6 +375,9 @@ export function installLens(payload) {
       }
     }
     document.querySelectorAll('.ul-row[data-usage-lens]').forEach(row => { if (!kept.has(row)) row.remove(); });
+    for (const host of replyHosts) {
+      if (!keptHosts.has(host)) { host.removeAttribute('data-usage-lens-reply'); replyHosts.delete(host); }
+    }
     paintMeter();
     if (!dialog.hidden) {
       if (!anchor?.isConnected || selectedSession?.id !== session.id) close();
@@ -422,6 +457,7 @@ export function installLens(payload) {
       document.removeEventListener('scroll', scrolling, true);
       window.removeEventListener('resize', resizing);
       document.querySelectorAll(`[${ATTR}]`).forEach(node => node.remove());
+      for (const host of replyHosts) host.removeAttribute('data-usage-lens-reply');
       delete window[KEY];
     }
   };

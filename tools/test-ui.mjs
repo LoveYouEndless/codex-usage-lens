@@ -33,9 +33,46 @@ try {
         node.previousElementSibling.classList.contains('native-buttons')
         && node.nextElementSibling.hasAttribute('data-assistant-message-sent-time')),
       'Usage is placed after the branch control and before the timestamp.');
+      await page.mouse.move(0, 0);
       check(await page.locator('.ul-button').last().evaluate(node =>
-        getComputedStyle(node).borderTopStyle === 'solid'), 'Native action styles do not erase the usage button border.');
+        getComputedStyle(node).borderTopWidth === '0px'
+        && getComputedStyle(node).backgroundColor === 'rgba(0, 0, 0, 0)'),
+      'The idle usage button is borderless and transparent.');
+      check(await page.locator('.ul-button svg').last().evaluate(node =>
+        node.getBoundingClientRect().width === 14), 'The compact usage icon renders.');
+      check(await page.locator('.ul-button').last().evaluate(node =>
+        getComputedStyle(node).color === getComputedStyle(node.closest('.actions').querySelector('.native-buttons button')).color),
+      'Usage text matches the native action color.');
+      const historicalRow = page.locator('.ul-row').first();
+      check(await historicalRow.evaluate(node => getComputedStyle(node).opacity === '0'),
+        'Historical usage is hidden along with idle native controls.');
+      await page.locator('.reply').first().hover();
+      check(await historicalRow.evaluate(node => getComputedStyle(node).opacity === '1'),
+        'Hovering the reply body reveals historical usage.');
+      await page.mouse.move(0, 0);
+      check(await historicalRow.evaluate(node => getComputedStyle(node).opacity === '0'),
+        'Leaving the historical reply hides its usage again.');
+      await page.locator('.ul-button').first().focus();
+      check(await historicalRow.evaluate(node => getComputedStyle(node).opacity === '1'),
+        'Keyboard focus reveals historical usage.');
+      await page.locator('.ul-button').first().click();
+      await page.mouse.move(0, 0);
+      check(await historicalRow.evaluate(node => getComputedStyle(node).opacity === '1'),
+        'An open historical detail panel keeps its trigger visible.');
+      await page.keyboard.press('Escape');
+      await page.locator('nav').evaluate(node => { node.tabIndex = -1; node.focus(); });
+      check(await historicalRow.evaluate(node => getComputedStyle(node).opacity === '0'),
+        'Historical usage hides after closing and moving focus away.');
+      await page.locator('.ul-button').last().hover();
+      check(await page.locator('.ul-button').last().evaluate(node =>
+        getComputedStyle(node).backgroundColor !== 'rgba(0, 0, 0, 0)'),
+      'Hovering Usage shows a subtle action background.');
       await page.locator('.ul-button').last().click();
+      await page.mouse.move(0, 0);
+      check(await page.locator('.ul-button').last().evaluate(node =>
+        node.getAttribute('aria-expanded') === 'true'
+        && getComputedStyle(node).backgroundColor !== 'rgba(0, 0, 0, 0)'),
+      'The pressed background remains while details are open.');
       check(await page.locator('.ul-dialog').isVisible(), 'Click opens the detail panel.');
       const bounds = await page.locator('.ul-dialog').boundingBox();
       check(bounds.x >= 0 && bounds.y >= 0 && bounds.x + bounds.width <= viewport.width + 1
@@ -113,6 +150,7 @@ try {
       check(!await page.locator('.ul-meter').isVisible(), 'Switching sessions does not carry over the previous total.');
       await page.evaluate(`(${removeLens.toString()})()`);
       check(await page.locator('[data-usage-lens]').count() === 0, 'Stop removes all injected UI.');
+      check(await page.locator('[data-usage-lens-reply]').count() === 0, 'Stop also restores reply host attributes.');
       check(!errors.length, `No browser errors: ${errors.join(', ')}`);
       await context.close();
     }

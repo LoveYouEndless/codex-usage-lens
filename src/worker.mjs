@@ -19,7 +19,7 @@ let tickPromise = null;
 const statusPath = join(config.stateDir, 'status.json');
 const controlPath = join(config.stateDir, 'control.json');
 const status = async value => atomicJSON(statusPath, {
-  product: 'codex-usage-lens', version: '0.1.1', pid: process.pid,
+  product: 'codex-usage-lens', version: '0.1.2', pid: process.pid,
   updatedAt: new Date().toISOString(), ...value
 });
 

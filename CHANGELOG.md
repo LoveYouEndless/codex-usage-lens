@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.1.2
+
+- Match native action text colors with a borderless idle state and subtle
+  hover/open backgrounds.
+- Add the compact Lucide database icon with third-party attribution.
+- Follow native historical action visibility on reply hover or keyboard focus.
+- Keep the usage trigger visible and marked expanded while its details are open.
+
 ## 0.1.1
 
 - Restore visible checkboxes under Codex's global input reset.

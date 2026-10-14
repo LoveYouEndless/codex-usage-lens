@@ -40,6 +40,8 @@ export function fixtureHTML({ mobile = false, dark = false, language = 'en' } = 
       input{appearance:none;border:0;padding:0}
       .actions{display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-height:26px;color:#888;font-size:11px}
       .native-buttons{display:flex;align-items:center;gap:13px;flex-shrink:0}
+      .native-buttons.opacity-0{opacity:0}
+      .reply:hover .native-buttons.opacity-0,.reply:focus-within .native-buttons.opacity-0{opacity:1}
       .actions>span{margin-left:6px;flex-shrink:0}
       .actions button{background:none;border:0;padding:0;color:inherit;font:inherit}
       .reply{margin-bottom:22px}.composer{margin-top:32px;border:1px solid ${dark ? '#444' : '#dedede'};border-radius:8px;padding:16px;color:#999;height:88px}
@@ -55,7 +57,7 @@ export function fixtureHTML({ mobile = false, dark = false, language = 'en' } = 
     <section class="reply" data-response-annotation-conversation="${sessionId}" data-response-annotation-target="message-1">
       <h2>The checks passed.</h2><p>The parser handles interrupted writes and keeps cached input separate from the total.
       The package is ready for the next review.</p>
-      <div class="actions"><div class="native-buttons"><button aria-label="Copy">Copy</button><button aria-label="Branch to new chat">Branch</button></div><span data-assistant-message-sent-time="true">14:10</span></div>
+      <div class="actions"><div class="native-buttons opacity-0"><button aria-label="Copy">Copy</button><button aria-label="Branch to new chat">Branch</button></div><span data-assistant-message-sent-time="true">14:10</span></div>
     </section>
     <div class="user">What changed in this turn?</div>
     <section class="reply" data-response-annotation-conversation="${sessionId}" data-response-annotation-target="message-2">

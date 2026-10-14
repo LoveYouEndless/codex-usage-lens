@@ -54,6 +54,9 @@ not install a login service.
 
 - Click **Usage** after the native branch control to open details. Narrow action
   rows keep Usage on a separate line.
+- Usage follows the native action color and has a borderless idle state, with a
+  subtle background on hover or while open. Historical controls appear on reply
+  hover or keyboard focus; the trigger stays visible while its panel is open.
 - Click outside the panel or press Escape to dismiss it.
 - Select Auto, Raw, K, or M for display units.
 - Enable **Show session meter** in the panel for a draggable floating total.
@@ -139,3 +142,4 @@ The runtime, parser, and UI were written independently for this project.
 Codex Monitor was a visual feasibility reference; no code was copied from it.
 
 MIT licensed. See [LICENSE](LICENSE).
+The Lucide database icon is covered by [third-party notices](THIRD_PARTY_NOTICES.md).
