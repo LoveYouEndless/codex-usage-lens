@@ -1,0 +1,10 @@
+node_modules/
+.runtime/
+coverage/
+*.log
+*.zip
+*.exe
+*.jsonl
+.env
+.env.*
+test-results/

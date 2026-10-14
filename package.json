@@ -1,0 +1,18 @@
+{
+  "name": "codex-usage-lens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local per-turn token usage buttons for Codex Desktop.",
+  "type": "module",
+  "license": "MIT",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "start": "node src/cli.mjs start",
+    "stop": "node src/cli.mjs stop",
+    "status": "node src/cli.mjs status",
+    "test": "node --test test/*.test.mjs",
+    "test:ui": "node tools/test-ui.mjs",
+    "demo": "node tools/demo.mjs"
+  },
+  "devDependencies": { "playwright": "1.62.1" }
+}
