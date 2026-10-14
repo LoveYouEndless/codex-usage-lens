@@ -52,10 +52,12 @@ not install a login service.
 
 ## Controls
 
-- Click **Usage** beneath a final reply to open details.
+- Click **Usage** after the native branch control to open details. Narrow action
+  rows keep Usage on a separate line.
 - Click outside the panel or press Escape to dismiss it.
 - Select Auto, Raw, K, or M for display units.
 - Enable **Show session meter** in the panel for a draggable floating total.
+- Meter details remain open during usage refreshes and stay next to the meter.
 - Ask **Stop Codex Usage Lens** to remove the UI and stop its helper.
 
 The interface uses Chinese for `zh` locales, and English otherwise.

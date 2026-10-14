@@ -21,7 +21,7 @@ export function removeLens() {
 }
 
 export function installLens(payload) {
-  const VERSION = '0.1.0';
+  const VERSION = '0.1.1';
   const KEY = '__codexUsageLens';
   const ATTR = 'data-usage-lens';
   const active = () => {
@@ -104,10 +104,12 @@ export function installLens(payload) {
   const style = make('style');
   style.textContent = `
     .ul-row{display:flex;align-items:center;gap:8px;max-width:100%;margin:4px 0 8px;min-height:26px}
+    .ul-row.ul-inline{flex:0 0 auto;margin:0 6px;min-height:22px}
+    .ul-row.ul-inline .ul-button{min-height:22px;padding:2px 7px;font-size:11px}
     .ul-button,.ul-dialog,.ul-meter{--ul-bg:#fff;--ul-fg:#222;--ul-sub:#707070;--ul-border:#dedede;
       color:var(--ul-fg);font:12px/1.45 system-ui,sans-serif;letter-spacing:0;box-sizing:border-box}
     .ul-dark{--ul-bg:#242424;--ul-fg:#f3f3f3;--ul-sub:#b0b0b0;--ul-border:#494949}
-    .ul-button{display:inline-flex;align-items:center;gap:7px;min-height:26px;padding:3px 9px;
+    .ul-row .ul-button{display:inline-flex;align-items:center;gap:7px;min-height:26px;padding:3px 9px;
       border:1px solid var(--ul-border);border-radius:5px;background:var(--ul-bg);cursor:pointer;
       white-space:nowrap;max-width:100%;box-shadow:none;flex-wrap:wrap;font-variant-numeric:tabular-nums}
     .ul-button:hover{filter:brightness(.96)}.ul-dark.ul-button:hover{filter:brightness(1.2)}
@@ -130,6 +132,8 @@ export function installLens(payload) {
     .ul-units button{padding:3px 7px;min-height:24px;background:transparent;border:0;color:var(--ul-sub);font:11px system-ui;cursor:pointer}
     .ul-units button[aria-checked=true]{background:var(--ul-border);color:var(--ul-fg)}
     .ul-meter-toggle{display:flex;align-items:center;gap:5px;font-size:11px;color:var(--ul-sub)}
+    .ul-meter-toggle input[type=checkbox]{appearance:auto;width:14px;height:14px;min-width:14px;
+      flex:0 0 14px;margin:0;opacity:1;accent-color:#348b69;cursor:pointer}
     .ul-meter{position:fixed;right:18px;top:90px;z-index:2147483000;background:var(--ul-bg);
       border:1px solid var(--ul-border);border-radius:6px;padding:8px 10px;max-width:calc(100vw - 24px);
       cursor:grab;box-shadow:0 3px 12px #0001;user-select:none;touch-action:none}
@@ -146,20 +150,37 @@ export function installLens(payload) {
   meter.hidden = true;
   document.body.append(meter);
   let anchor = null;
+  let dialogSignature = null;
 
   const place = () => {
     if (dialog.hidden || !anchor?.isConnected) return;
-    const rect = anchor.getBoundingClientRect();
+    const rect = (meter.contains(anchor) ? meter : anchor).getBoundingClientRect();
+    const gap = meter.contains(anchor) ? 4 : 6;
     const width = dialog.offsetWidth;
     const height = dialog.offsetHeight;
-    const left = Math.max(12, Math.min(rect.left, innerWidth - width - 12));
-    const top = rect.bottom + height + 8 < innerHeight
-      ? rect.bottom + 6 : Math.max(12, rect.top - height - 6);
+    const alignedLeft = rect.left + width <= innerWidth - 12 ? rect.left : rect.right - width;
+    const left = Math.max(12, Math.min(alignedLeft, innerWidth - width - 12));
+    const top = rect.bottom + height + gap <= innerHeight - 12
+      ? rect.bottom + gap : rect.top - height - gap;
     dialog.style.left = `${left}px`;
     dialog.style.top = `${Math.max(12, Math.min(top, innerHeight - height - 12))}px`;
   };
-  const close = () => { dialog.hidden = true; selected = null; selectedSession = null; anchor = null; };
+  const close = () => { dialog.hidden = true; selected = null; selectedSession = null; anchor = null; dialogSignature = null; };
   function renderDialog() {
+    const session = selectedSession || data?.session;
+    const usage = selected?.usage || session?.total;
+    if (!usage) { close(); return; }
+    const signature = JSON.stringify({
+      selected, session: {
+        model: session.model, provider: session.provider, total: session.total,
+        context: session.context, window: session.window, updatedAt: session.updatedAt
+      }, unit, showMeter, language: language()
+    });
+    if (signature === dialogSignature) return;
+    dialogSignature = signature;
+    const focused = dialog.contains(document.activeElement) ? document.activeElement : null;
+    const focusedUnit = focused?.getAttribute('data-ul-unit');
+    const focusedCheckbox = focused?.type === 'checkbox';
     dialog.replaceChildren();
     theme(dialog);
     const head = make('div', 'ul-head');
@@ -178,9 +199,6 @@ export function installLens(payload) {
       const dd = make('dd', className, value);
       table.append(dt, dd);
     };
-    const session = selectedSession || data?.session;
-    const usage = selected?.usage || session?.total;
-    if (!usage) { close(); return; }
     row(t('usage'), `${format(usage.total)} tok`, 'ul-total');
     row(t('input'), `${format(usage.input)} tok`);
     row(t('cached'), `${format(usage.cached)} tok`, 'ul-subrow');
@@ -217,6 +235,7 @@ export function installLens(payload) {
       const button = make('button', '', option === 'raw' ? t('raw') : option === 'auto' ? 'Auto' : option);
       button.type = 'button';
       button.setAttribute('role', 'radio');
+      button.setAttribute('data-ul-unit', option);
       button.setAttribute('aria-checked', String(unit === option));
       button.onclick = () => { unit = option; preference('unit', unit); paint(); renderDialog(); place(); };
       units.append(button);
@@ -229,6 +248,8 @@ export function installLens(payload) {
     label.append(check, make('span', '', t('meter')));
     controls.append(units, label);
     dialog.append(controls);
+    if (focusedCheckbox) check.focus({ preventScroll: true });
+    else if (focusedUnit) units.querySelector(`[data-ul-unit="${focusedUnit}"]`)?.focus({ preventScroll: true });
   }
   function open(button, turn, session) {
     const same = anchor === button && !dialog.hidden;
@@ -244,13 +265,20 @@ export function installLens(payload) {
   function paintMeter() {
     const session = data?.session;
     meter.hidden = !showMeter || !session || session.id !== active();
-    if (meter.hidden) return;
+    if (meter.hidden) { if (anchor && meter.contains(anchor)) close(); return; }
     theme(meter);
-    const button = make('button');
-    button.type = 'button';
-    button.append(make('span', 'ul-meter-label', t('session')),
-      make('span', 'ul-meter-value', `${format(session.total.total)} tok`));
-    meter.replaceChildren(button);
+    let button = meter.querySelector('button');
+    if (!button) {
+      button = make('button');
+      button.type = 'button';
+      button.append(make('span', 'ul-meter-label'), make('span', 'ul-meter-value'));
+      meter.append(button);
+    }
+    const label = button.querySelector('.ul-meter-label');
+    const value = button.querySelector('.ul-meter-value');
+    const caption = `${format(session.total.total)} tok`;
+    if (label.textContent !== t('session')) label.textContent = t('session');
+    if (value.textContent !== caption) value.textContent = caption;
   }
   function paint() {
     if (destroyed) return;
@@ -281,8 +309,8 @@ export function installLens(payload) {
       const actionRow = stamp?.parentElement;
       if (!turn || used.has(turn.id) || !actionRow || actionRow.closest(`[${ATTR}]`)) continue;
       used.add(turn.id);
-      let row = actionRow.nextElementSibling;
-      if (!row?.matches('.ul-row[data-usage-lens]')) {
+      let row = host.querySelector('.ul-row[data-usage-lens]');
+      if (!row) {
         row = make('div', 'ul-row');
         actionRow.insertAdjacentElement('afterend', row);
       }
@@ -296,6 +324,23 @@ export function installLens(payload) {
       button.setAttribute('data-usage-lens-turn', turn.id);
       button.onclick = () => open(button, turn, session);
       theme(button);
+      const actionStyle = getComputedStyle(actionRow);
+      const nativeChildren = Array.from(actionRow.children).filter(node => node !== row);
+      const nativeWidth = nativeChildren.reduce((sum, node) => {
+        const style = getComputedStyle(node);
+        return sum + node.getBoundingClientRect().width
+          + (parseFloat(style.marginLeft) || 0) + (parseFloat(style.marginRight) || 0);
+      }, 0);
+      const required = nativeWidth + button.getBoundingClientRect().width
+        + (parseFloat(actionStyle.columnGap) || 0) * nativeChildren.length + 16;
+      const inline = actionStyle.display.includes('flex') && actionStyle.flexDirection === 'row'
+        && actionRow.clientWidth >= required;
+      row.classList.toggle('ul-inline', inline);
+      if (inline) {
+        if (row.parentElement !== actionRow || row.nextElementSibling !== stamp) actionRow.insertBefore(row, stamp);
+      } else if (row.parentElement !== actionRow.parentElement || row.previousElementSibling !== actionRow) {
+        actionRow.insertAdjacentElement('afterend', row);
+      }
     }
     document.querySelectorAll('.ul-row[data-usage-lens]').forEach(row => { if (!kept.has(row)) row.remove(); });
     paintMeter();
@@ -323,14 +368,16 @@ export function installLens(payload) {
     attributeFilter: ['data-app-action-sidebar-thread-active', 'data-response-annotation-conversation']
   });
   const outside = event => {
-    if (!dialog.hidden && !dialog.contains(event.target) && !anchor?.contains(event.target)) close();
+    const anchorRoot = anchor && meter.contains(anchor) ? meter : anchor;
+    if (!dialog.hidden && !dialog.contains(event.target) && !anchorRoot?.contains(event.target)) close();
   };
   const keyboard = event => { if (event.key === 'Escape' && !dialog.hidden) { const previous = anchor; close(); previous?.focus(); } };
   const scrolling = () => { if (!dialog.hidden) place(); };
+  const resizing = () => { schedule(); scrolling(); };
   document.addEventListener('pointerdown', outside, true);
   document.addEventListener('keydown', keyboard);
   document.addEventListener('scroll', scrolling, true);
-  window.addEventListener('resize', scrolling);
+  window.addEventListener('resize', resizing);
   let drag = null;
   meter.addEventListener('pointerdown', event => {
     if (event.button !== 0) return;
@@ -347,6 +394,7 @@ export function installLens(payload) {
     meter.style.right = 'auto';
     meter.style.left = `${Math.max(8, Math.min(innerWidth - meter.offsetWidth - 8, drag.left + dx))}px`;
     meter.style.top = `${Math.max(8, Math.min(innerHeight - meter.offsetHeight - 8, drag.top + dy))}px`;
+    place();
   });
   meter.addEventListener('click', event => {
     if (drag?.moved) { event.preventDefault(); event.stopImmediatePropagation(); return; }
@@ -372,7 +420,7 @@ export function installLens(payload) {
       document.removeEventListener('pointerdown', outside, true);
       document.removeEventListener('keydown', keyboard);
       document.removeEventListener('scroll', scrolling, true);
-      window.removeEventListener('resize', scrolling);
+      window.removeEventListener('resize', resizing);
       document.querySelectorAll(`[${ATTR}]`).forEach(node => node.remove());
       delete window[KEY];
     }

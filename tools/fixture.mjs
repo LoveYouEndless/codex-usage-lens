@@ -37,7 +37,10 @@ export function fixtureHTML({ mobile = false, dark = false, language = 'en' } = 
       nav strong{font-size:15px}nav span{font-size:11px;color:${dark ? '#aaa' : '#777'}}
       .user{margin:20px 0 26px auto;width:fit-content;max-width:100%;background:${dark ? '#333' : '#f2f2f2'};padding:9px 14px;border-radius:7px}
       p{margin:0 0 16px}h2{font-size:15px;margin:0 0 10px}
-      .actions{display:flex;align-items:center;gap:13px;height:26px;color:#888;font-size:11px}
+      input{appearance:none;border:0;padding:0}
+      .actions{display:flex;align-items:center;flex-wrap:wrap;gap:2px;min-height:26px;color:#888;font-size:11px}
+      .native-buttons{display:flex;align-items:center;gap:13px;flex-shrink:0}
+      .actions>span{margin-left:6px;flex-shrink:0}
       .actions button{background:none;border:0;padding:0;color:inherit;font:inherit}
       .reply{margin-bottom:22px}.composer{margin-top:32px;border:1px solid ${dark ? '#444' : '#dedede'};border-radius:8px;padding:16px;color:#999;height:88px}
       @media(max-width:600px){.layout{grid-template-columns:minmax(0,1fr)}aside{display:none}main{padding:20px 18px}
@@ -52,13 +55,13 @@ export function fixtureHTML({ mobile = false, dark = false, language = 'en' } = 
     <section class="reply" data-response-annotation-conversation="${sessionId}" data-response-annotation-target="message-1">
       <h2>The checks passed.</h2><p>The parser handles interrupted writes and keeps cached input separate from the total.
       The package is ready for the next review.</p>
-      <div class="actions"><button aria-label="Copy">Copy</button><button aria-label="Share">Share</button><span data-assistant-message-sent-time="true">14:10</span></div>
+      <div class="actions"><div class="native-buttons"><button aria-label="Copy">Copy</button><button aria-label="Branch to new chat">Branch</button></div><span data-assistant-message-sent-time="true">14:10</span></div>
     </section>
     <div class="user">What changed in this turn?</div>
     <section class="reply" data-response-annotation-conversation="${sessionId}" data-response-annotation-target="message-2">
       <p>I checked the session boundaries, replayed the usage events, and verified the compact view at narrow widths.</p>
       <p>There are no duplicate counts when the same cumulative event appears twice.</p>
-      <div class="actions"><button aria-label="Copy">Copy</button><button aria-label="Share">Share</button><span data-assistant-message-sent-time="true">14:12</span></div>
+      <div class="actions"><div class="native-buttons"><button aria-label="Copy">Copy</button><button aria-label="Branch to new chat">Branch</button></div><span data-assistant-message-sent-time="true">14:12</span></div>
     </section>
     <div class="composer">Ask a follow-up</div></main></div></body></html>`;
 }

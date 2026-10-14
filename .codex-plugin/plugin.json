@@ -1,6 +1,6 @@
 {
   "name": "codex-usage-lens",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Per-turn token usage buttons and a compact session meter for Codex Desktop.",
   "license": "MIT",
   "skills": "./skills/",

@@ -1,4 +1,7 @@
 import { spawnSync } from 'node:child_process';
+import { readFile } from 'node:fs/promises';
+
+const packageInfo = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8'));
 
 const accountIndex = process.argv.indexOf('--account');
 const account = accountIndex >= 0 ? process.argv[accountIndex + 1] : null;
@@ -41,19 +44,11 @@ if (process.argv.includes('--create')) {
   console.log(JSON.stringify({ url: repo.html_url, remote: repo.clone_url }));
 }
 if (process.argv.includes('--release')) {
+  const notesIndex = process.argv.indexOf('--notes');
+  if (notesIndex < 0 || !process.argv[notesIndex + 1]) throw new Error('Release notes file is required: --notes PATH.');
+  const notes = await readFile(process.argv[notesIndex + 1], 'utf8');
   const release = await request(`/repos/${user.login}/codex-usage-lens/releases`, 'POST', {
-    tag_name: 'v0.1.0', name: 'Codex Usage Lens v0.1.0',
-    body: [
-      'Independent first release, licensed under MIT.',
-      '',
-      '- Compact per-turn usage buttons beneath final replies.',
-      '- Input, cache, output, reasoning, session totals, and optional draggable meter.',
-      '- Local-only runtime with no production dependencies.',
-      '- Codex plugin marketplace manifest and Windows activation scripts.',
-      '- 19 core tests and 60 desktop/mobile, light/dark browser checks passed locally.',
-      '',
-      'Requires Node.js 22 and a loopback debug-enabled Codex launch. Windows is the first validated setup path. See the README for compatibility and installation details.'
-    ].join('\n')
+    tag_name: `v${packageInfo.version}`, name: `Codex Usage Lens v${packageInfo.version}`, body: notes
   });
   console.log(JSON.stringify({ release: release.html_url }));
 }
