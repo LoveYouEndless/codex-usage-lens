@@ -1,13 +1,13 @@
 {
   "name": "codex-usage-lens",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "Per-turn token usage buttons and a compact session meter for Codex Desktop.",
   "license": "MIT",
   "skills": "./skills/",
   "interface": {
     "displayName": "Codex Usage Lens",
     "shortDescription": "See each turn's token usage without leaving your conversation.",
-    "longDescription": "Reads local session usage records and adds compact usage buttons through a localhost debugging connection. First activation requires Node.js 22 and a debug-enabled Codex launch.",
+    "longDescription": "Local token usage buttons with one-time Windows setup, login recovery, plugin-switch synchronization, and a dedicated launcher. Unsupported client interfaces pause statistics; Codex's normal launcher remains unchanged.",
     "category": "Productivity",
     "capabilities": ["Local", "Read", "Interactive"],
     "defaultPrompt": ["Start Codex Usage Lens.", "Stop Codex Usage Lens.", "Check Codex Usage Lens status."]

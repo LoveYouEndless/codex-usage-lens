@@ -5,21 +5,32 @@ import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 import { setTimeout as pause } from 'node:timers/promises';
 import { options, ensureState, readJSON, controlRequest } from './state.mjs';
+import { readPolicy } from './policy.mjs';
+import { discover } from './cdp.mjs';
 
 async function main() {
   if (Number(process.versions.node.split('.')[0]) < 22) throw new Error('Node.js 22 or newer is required.');
   const [action = 'help', ...args] = process.argv.slice(2);
   if (['help', '--help', '-h'].includes(action)) {
-    console.log('Codex Usage Lens\nnode src/cli.mjs start|stop|status [--port PORT] [--state-dir DIR] [--codex-home DIR]');
+    console.log('Codex Usage Lens\nnode src/cli.mjs start|resume|stop|status|connection [--port PORT] [--state-dir DIR] [--codex-home DIR] [--plugin-id ID]');
     return;
   }
-  if (!['start', 'stop', 'status'].includes(action)) throw new Error(`Unknown command: ${action}`);
+  if (!['start', 'resume', 'stop', 'status', 'connection'].includes(action)) throw new Error(`Unknown command: ${action}`);
   const config = options(args);
   const statusPath = join(config.stateDir, 'status.json');
+  if (action === 'connection') {
+    try { const found = await discover(config.port); console.log(JSON.stringify({ connected: true, port: found.port })); }
+    catch { console.log(JSON.stringify({ connected: false })); }
+    return;
+  }
   if (action === 'status') {
     const running = await controlRequest(config.stateDir, 'ping');
     const status = await readJSON(statusPath);
-    console.log(JSON.stringify({ ...status, running, state: running ? status?.state || 'starting' : 'stopped' }, null, 2));
+    const policy = await readPolicy(config.codexHome, config.pluginId);
+    console.log(JSON.stringify({
+      ...status, running, policy: policy.state,
+      state: running ? status?.state || 'starting' : status?.state || 'stopped'
+    }, null, 2));
     return;
   }
   if (action === 'stop') {
@@ -32,6 +43,16 @@ async function main() {
       if (await controlRequest(config.stateDir, 'ping')) throw new Error('Helper is still stopping. Check status before restarting.');
     }
     console.log(requested ? 'Codex Usage Lens stopped.' : 'Codex Usage Lens is not running.');
+    return;
+  }
+  const policy = await readPolicy(config.codexHome, config.pluginId);
+  if (!policy.enabled) {
+    await controlRequest(config.stateDir, 'stop');
+    console.log(JSON.stringify({ product: 'codex-usage-lens', state: policy.state, running: false }, null, 2));
+    return;
+  }
+  if (action === 'resume' && await controlRequest(config.stateDir, 'ping')) {
+    console.log(JSON.stringify({ product: 'codex-usage-lens', running: true, state: 'already-running' }));
     return;
   }
   await ensureState(config.stateDir);

@@ -17,14 +17,15 @@ export function options(args) {
   const portValue = value('--port');
   const port = portValue === undefined ? undefined : Number(portValue);
   if (port !== undefined && (!Number.isInteger(port) || port < 1 || port > 65535)) throw new Error('Invalid port.');
-  const allowed = new Set(['--port', '--state-dir', '--codex-home']);
+  const allowed = new Set(['--port', '--state-dir', '--codex-home', '--plugin-id']);
   for (let index = 0; index < args.length; index += 2) {
     if (!allowed.has(args[index])) throw new Error(`Unknown option: ${args[index]}`);
     value(args[index]);
   }
   return {
     port, stateDir: resolve(value('--state-dir') || defaultState()),
-    codexHome: resolve(value('--codex-home') || defaultHome())
+    codexHome: resolve(value('--codex-home') || defaultHome()),
+    pluginId: value('--plugin-id')
   };
 }
 

@@ -1,34 +1,45 @@
 ---
 name: usage-lens
-description: Start, stop, or check the Codex Usage Lens local token display when requested. Requires Node.js 22 and a Codex desktop renderer with localhost debugging enabled.
+description: Activate, stop, uninstall, or check Codex Usage Lens token statistics. Windows activation configures a stable optional launcher and login recovery, then starts the local helper.
 ---
 
 # Codex Usage Lens
 
 Resolve the plugin root as two directories above this skill directory.
-Run commands from that root. On Windows, prefer
-`powershell -NoProfile -ExecutionPolicy Bypass -File scripts/control.ps1 -Action Start`
-(or `Stop` / `Status`), which also discovers Codex's bundled Node runtime when
-`node` is not on PATH. The runtime reads local session JSONL files;
-it does not call a model API or send conversation content to a remote service.
+Run commands from that root. On Windows use:
 
-- Start: `node src/cli.mjs start`. It discovers existing debug ports and starts
-  a detached helper. Check `node src/cli.mjs status` after activation.
-- Stop: `node src/cli.mjs stop`. It removes Lens UI and stops only its own helper.
-- Check: `node src/cli.mjs status`. Report the selected session and connection state.
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/control.ps1 -Action Start
+```
 
-If no debug-enabled renderer exists, explain that a one-time launch setup is
-required. On Windows, `scripts/launch-windows.ps1` can discover the desktop
-executable or accept `-CodexPath`, create a dedicated desktop shortcut with
-loopback debugging enabled, or launch it. The launcher refuses to restart a
-running client. Have the user finish active work and close it normally before
-launching. Do not kill Codex processes or patch installed application files.
+Activation discovers Node.js 22 (including Codex's cached runtime), deploys
+shipped code outside the plugin cache, creates an owned desktop shortcut and a
+login-recovery shortcut, and starts the helper. Explain this persistent setup
+when reporting activation. It never edits the normal Codex shortcut, client
+resources, or user config. Use `-Action Status` to verify the result.
 
-Use `--port PORT` to select a specific existing debug endpoint. If a custom
-`CODEX_HOME` is configured, the runtime uses it for session logs and Lens state.
-The plugin's cached checkout is never used to store personal conversation logs.
-After an upgrade, starting Lens stops the prior Lens helper before replacing it.
+If status is `waiting` and no connection is present, the only user step is to
+finish active work, close Codex normally, and open the new **Codex Usage Lens**
+shortcut. Do not ask users to type debugging arguments. Existing compatible
+debug launchers need no additional restart. Never terminate Codex or re-open
+it while a task is running.
 
-Do not claim that installation alone enables debugging, that token counts equal
-subscription credits, or that a successful helper spawn confirms rendered UI.
-For those checks inspect status and the visible usage button.
+- `-Action Stop` removes statistics and stops the current helper. Login recovery
+  remains registered; the enabled plugin can resume on next login/launcher use.
+- `-Action Uninstall` stops the helper and removes only the owned Lens shortcuts.
+  Run this before removing the plugin from Codex.
+- Turning the existing `plugins."<plugin-id>".enabled` switch off stops the
+  running helper. Enabling it again takes effect on the next Lens activation,
+  dedicated launch, or login. Do not invent another Codex config field.
+- `-Port`, `-StateDir`, `-CodexHome`, and `-CodexPath` are troubleshooting options.
+  Preserve a configured `CODEX_HOME`.
+
+On macOS/Linux, Windows setup is unavailable. The portable CLI is
+`node src/cli.mjs start|resume|stop|status`; it still needs an existing local
+desktop connection and an enabled installed plugin.
+
+If status is `incompatible`, explain that statistics are paused for the
+affected renderer and Codex can continue normally. Do not patch, restart, or
+repeatedly inject into the client to work around it. A Lens update is the
+appropriate fix. Do not claim universal compatibility with future clients,
+that a helper spawn proves visible UI, or that tokens equal subscription credits.

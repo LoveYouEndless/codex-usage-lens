@@ -24,31 +24,45 @@ Install **Codex Usage Lens**, then ask:
 Start Codex Usage Lens.
 ```
 
-The plugin includes an activation skill, the local runtime, and a marketplace
-manifest. It does **not** require an API key or paid service. The runtime has
-zero production dependencies and requires Node.js 22 or newer. The Windows
-controller can use Codex's cached Node runtime when available.
+On Windows, activation automatically prepares the local helper, a **Codex Usage
+Lens** desktop shortcut, and login recovery. No API key or terminal commands are
+needed in the normal installation flow.
 
-**One-time desktop setup:** the desktop app needs a loopback debugging port.
-If your launcher already provides one, Lens discovers ports 9229, 9222, 9230,
-and 9223 automatically. Otherwise, finish active work and close Codex normally,
-then ask the activation skill to create a dedicated debug-enabled shortcut.
-The Windows launcher can also be run manually:
+If activation says a first-time reopen is needed, finish active work, close
+Codex normally, and use the new shortcut. An existing compatible launcher works
+without this additional step. Use the dedicated shortcut for future launches;
+the original shortcut remains available and unchanged.
 
-```powershell
-.\scripts\launch-windows.ps1 -CreateShortcut
-# After closing Codex normally, open the new desktop shortcut.
-.\scripts\control.ps1 -Action Start
+## Restart And Upgrade Behavior
+
+| Scenario | Behavior |
+| --- | --- |
+| First activation | Detect the runtime, deploy stable helper code, and register dedicated shortcuts |
+| Codex restart | Reconnect when Codex is opened through Lens or another compatible launcher |
+| Computer restart | Restore the helper after login and wait; do not open Codex automatically |
+| Plugin disabled | Withdraw statistics and exit; no config files are edited |
+| Codex upgrade | Discover the new installed executable instead of retaining a version-specific shortcut |
+| Incompatible UI | Pause injection for the affected renderer; continue using Codex normally |
+
+The existing Codex plugin switch is honored:
+
+```toml
+[plugins."codex-usage-lens@codex-usage-lens"]
+enabled = true
 ```
 
-If automatic executable discovery fails, pass `-CodexPath "C:\path\to\Codex.exe"`.
-For a custom port, use the same `-Port` on the launcher and controller.
-The shortcut targets the installed executable: recreate it if an app update
-changes that path. Lens never terminates Codex or modifies its installation.
+Setting it to `false` stops the running helper at its next policy check.
+Missing/uninstalled plugin entries also stop it. Temporarily invalid TOML pauses
+statistics without quoting settings into logs. Re-enabling takes effect on the
+next activation, dedicated launch, or login. Recovery registration alone cannot
+enable an app launched without a usable local connection.
 
-The helper reconnects after a desktop renderer reload or app restart while it
-is running. Start it again after signing out or rebooting; this release does
-not install a login service.
+Lens runs separately from Codex. The dedicated launcher falls back to ordinary
+startup on missing Node, unavailable configuration, or a busy debug port. If
+debug launch throws or the client exits immediately, it tries ordinary startup
+once. It never terminates Codex or alters installed client files. Unknown future
+client changes cannot be guaranteed compatible; keep the original shortcut as
+a direct fallback. Updating Lens and activating it once resumes updated code.
 
 ## Controls
 
@@ -69,6 +83,7 @@ CLI controls from the plugin root:
 
 ```sh
 node src/cli.mjs start
+node src/cli.mjs resume
 node src/cli.mjs status
 node src/cli.mjs stop
 node src/cli.mjs start --port 9229
@@ -77,6 +92,30 @@ node src/cli.mjs start --port 9229
 `CODEX_HOME` selects the log home. `--codex-home` and `--state-dir` override log
 and helper-state locations. Default state is `%LOCALAPPDATA%\CodexUsageLens` on
 Windows and `$CODEX_HOME/usage-lens` (or `~/.codex/usage-lens`) elsewhere.
+
+## Advanced Setup
+
+Node.js 22 or newer is required. Windows activation discovers system Node or
+Codex's cached runtime. The TOML parser is bundled; users do not run `npm install`.
+The renderer connection uses loopback Chrome DevTools Protocol. Existing ports
+9229, 9222, 9230, and 9223 are detected at setup; the dedicated launcher prepares
+the selected connection automatically.
+
+```powershell
+.\scripts\control.ps1 -Action Start
+.\scripts\control.ps1 -Action Status
+.\scripts\control.ps1 -Action Stop
+.\scripts\control.ps1 -Action Uninstall
+# Troubleshooting only:
+.\scripts\control.ps1 -Action Start -CodexPath "C:\path\to\Codex.exe" -Port 9229
+```
+
+`Stop` affects the current helper. Login recovery stays registered until
+`Uninstall`, and resumes only while the Codex plugin remains enabled. Runtime
+code is installed into `%LOCALAPPDATA%\CodexUsageLens\runtimes\<version>`, with
+stable launcher scripts and `install.json` beside it. Plugin-cache deletion
+does not invalidate the login entry. Launcher and helper diagnostics are local
+`launcher-status.json`, `status.json`, and `helper.log`.
 
 ## What The Numbers Mean
 
@@ -115,19 +154,22 @@ cumulative session totals are not summed together.
 - Runtime operation sends no data to remote servers. Logs are read locally;
   only counters, session/turn/message IDs, model names, and timestamps are
   transferred to the local renderer. Conversation bodies are not retained or
-  transferred by Lens. No installed files or session logs are written.
+  transferred by Lens. No Codex installation files or session logs are written.
 - A debugging port allows local software to control the renderer. Keep it
   bound to loopback; do not expose or forward it to a network.
 
-To uninstall, stop Lens before removing the plugin. Delete its dedicated
-shortcut and state directory if desired. Marketplace removal alone does not
-stop an already-running helper.
+To uninstall, ask **Uninstall Codex Usage Lens startup configuration** before
+removing the plugin, or run `control.ps1 -Action Uninstall`. It removes only its
+owned desktop/login shortcuts and stops the helper. It leaves local state/code
+for optional manual cleanup. Removing or disabling the Codex plugin stops a
+running 0.2.x helper but does not itself delete the shortcut files.
 
 ## Development
 
 ```sh
 npm ci
 npm test
+npm run test:windows
 npx playwright install chromium
 npm run test:ui
 npm run demo
@@ -138,8 +180,9 @@ desktop/mobile widths, light/dark mode, popup bounds, units, session switching,
 repeat injection, and cleanup. `PLAYWRIGHT_CHANNEL=chrome` can use an installed
 Chrome browser instead of a downloaded Chromium.
 
-The runtime, parser, and UI were written independently for this project.
+The session parser, runtime integration, and UI were written independently for this project.
 Codex Monitor was a visual feasibility reference; no code was copied from it.
 
 MIT licensed. See [LICENSE](LICENSE).
-The Lucide database icon is covered by [third-party notices](THIRD_PARTY_NOTICES.md).
+The Lucide database icon and bundled TOML parser are covered by
+[third-party notices](THIRD_PARTY_NOTICES.md).

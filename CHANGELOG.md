@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.2.0
+
+- Windows activation configures the helper, a stable dedicated launcher, and
+  login recovery; users no longer need to enter debugging commands.
+- Ship the runtime outside the plugin cache so cache cleanup does not break
+  registered startup entries.
+- Read Codex's existing plugin enable switch with a bundled TOML parser. Disable,
+  removal, and invalid-config cases stop or pause statistics without editing
+  user configuration.
+- Re-discover the Codex executable after upgrades. A missing runtime, disabled
+  switch, busy port, or immediately rejected debug launch falls back to ordinary
+  startup; the original Codex launcher remains untouched.
+- Probe interface compatibility before injection. Unsupported markup and
+  repeated renderer failures withdraw statistics and pause further injection
+  into that renderer.
+- Add owned-shortcut uninstall and idempotent helper recovery.
+
 ## 0.1.2
 
 - Match native action text colors with a borderless idle state and subtle

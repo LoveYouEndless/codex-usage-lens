@@ -19,6 +19,8 @@ jobs:
           cache: npm
       - run: npm ci --ignore-scripts
       - run: npm test
+      - run: npm run test:windows
+        if: runner.os == 'Windows'
   browser:
     runs-on: ubuntu-latest
     steps:

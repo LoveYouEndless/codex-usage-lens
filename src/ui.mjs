@@ -16,12 +16,14 @@ export function inspectPage() {
 
 export function removeLens() {
   const runtime = window.__codexUsageLens;
-  runtime?.destroy();
+  try { runtime?.destroy(); } catch { /* Remove owned nodes even if an old runtime fails to clean up. */ }
+  document.querySelectorAll('[data-usage-lens]').forEach(node => node.remove());
+  document.querySelectorAll('[data-usage-lens-reply]').forEach(node => node.removeAttribute('data-usage-lens-reply'));
   return { removed: true };
 }
 
 export function installLens(payload) {
-  const VERSION = '0.1.2';
+  const VERSION = '0.2.0';
   const KEY = '__codexUsageLens';
   const ATTR = 'data-usage-lens';
   const active = () => {

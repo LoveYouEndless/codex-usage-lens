@@ -3,6 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createRequire } from 'node:module';
 import { installLens, removeLens } from '../src/ui.mjs';
+import { probePage } from '../src/compatibility.mjs';
 import { sample, fixtureHTML, otherId } from './fixture.mjs';
 
 const require = createRequire(import.meta.url);
@@ -23,6 +24,8 @@ try {
       const errors = [];
       page.on('pageerror', error => errors.push(error.message));
       await page.setContent(fixtureHTML({ dark, language: 'zh-CN' }));
+      check((await page.evaluate(`(${probePage.toString()})()`)).state === 'supported',
+        'Known desktop anchors pass the read-only compatibility check.');
       const first = await inject(page);
       check(first.buttons === 2, 'Each final reply has exactly one usage button.');
       await inject(page);
@@ -151,6 +154,14 @@ try {
       await page.evaluate(`(${removeLens.toString()})()`);
       check(await page.locator('[data-usage-lens]').count() === 0, 'Stop removes all injected UI.');
       check(await page.locator('[data-usage-lens-reply]').count() === 0, 'Stop also restores reply host attributes.');
+      await page.setContent('<html><body><main>Future desktop interface</main></body></html>');
+      check((await page.evaluate(`(${probePage.toString()})()`)).state === 'idle',
+        'An empty or unknown page waits read-only without injecting guessed UI.');
+      check(await page.locator('[data-usage-lens]').count() === 0,
+        'Compatibility probing leaves unsupported interfaces unchanged.');
+      await page.setContent('<html><body><span data-assistant-message-sent-time="true">14:12</span></body></html>');
+      check((await page.evaluate(`(${probePage.toString()})()`)).state === 'unsupported-ui',
+        'Incompatible reply anchors are explicitly rejected before injection.');
       check(!errors.length, `No browser errors: ${errors.join(', ')}`);
       await context.close();
     }

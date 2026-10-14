@@ -19,27 +19,40 @@ https://github.com/LoveYouEndless/codex-usage-lens
 启动 Codex Usage Lens。
 ```
 
-插件包含启用技能和完整的本地程序，无需 API Key，也没有收费服务。
-运行程序没有第三方生产依赖，需要 Node.js 22 及以上；Windows 控制脚本会
-优先寻找系统 Node，也可以使用 Codex 已缓存的 Node 运行环境。
+Windows 首次启用会自动准备本地助手、**Codex Usage Lens** 桌面快捷方式和
+登录恢复入口。正常安装流程不需要输入终端命令，也不需要 API Key。
 
-**首次启用还需要本地调试连接。** 已有带调试端口的启动器时，插件会自动
-寻找 9229、9222、9230、9223。否则，先结束正在进行的任务并正常关闭 Codex，
-再让插件的启用技能创建专用启动快捷方式。手动设置方式如下：
+如果提示首次需要重新打开客户端，先结束正在进行的任务、正常退出 Codex，
+再使用新建的快捷方式打开。已有兼容启动器的电脑无需这一步。
+以后使用 Lens 快捷方式打开；原来的 Codex 快捷方式保留且不修改。
 
-```powershell
-.\scripts\launch-windows.ps1 -CreateShortcut
-# 正常退出 Codex 后，使用新建的桌面快捷方式打开。
-.\scripts\control.ps1 -Action Start
+## 重启与升级
+
+| 场景 | 实际行为 |
+| --- | --- |
+| 首次启用 | 检测运行环境、部署独立助手、建立桌面和登录快捷方式 |
+| 重启 Codex | 通过 Lens 或其他兼容启动器打开后自动恢复显示 |
+| 重启电脑 | 登录后恢复助手并等待，不主动打开 Codex |
+| 关闭插件开关 | 撤下统计并退出助手，不修改配置文件 |
+| 客户端升级 | 启动器重新查找已安装客户端，避免快捷方式绑定旧版本路径 |
+| 界面不兼容 | 暂停对该窗口的注入，等待后续 Lens 更新 |
+
+沿用 Codex 原有开关：
+
+```toml
+[plugins."codex-usage-lens@codex-usage-lens"]
+enabled = true
 ```
 
-找不到客户端时，加上 `-CodexPath "C:\实际路径\Codex.exe"`。
-使用其他端口时，启动器和控制脚本都要指定相同的 `-Port`。
-客户端升级后，如果可执行文件路径改变，需要重新创建快捷方式。
-脚本不会强行关闭客户端，也不会修改安装包。
+改为 `false` 后，助手在下一次检查时撤下统计并退出；移除插件条目也会退出。
+配置临时无法解析时暂停统计，不把配置内容写入日志。重新开启后，在下一次
+启用插件、使用专用启动器或登录时恢复。登录恢复本身无法让普通启动的客户端
+自动获得所需连接。
 
-助手运行期间会在客户端重启或页面重载后自动重连。注销或重启电脑后，需要
-再次启动助手；第一版没有安装登录自启服务。
+Lens 与 Codex 独立运行。Node 缺失、配置不可用或连接端口被占用时，启动器
+改用普通启动；调试启动报错或客户端立即退出时，只尝试一次普通启动。
+不会强行关闭客户端，也不会修改安装包。不能保证未来所有版本都兼容，
+原始 Codex 快捷方式始终可作为直接启动入口。Lens 更新后启用一次即可部署新版。
 
 ## 使用
 
@@ -84,17 +97,40 @@ https://github.com/LoveYouEndless/codex-usage-lens
 消息 ID、模型名和时间戳；不保留或传递对话正文，不写入会话日志和安装包。
 调试端口应仅监听本机，不要开放或转发到网络。
 
-卸载前先停止 Lens，再移除插件。可以删除专用快捷方式及状态目录。
-仅移除插件不会停止已经运行的助手。
+卸载前对 Codex 说「卸载 Codex Usage Lens 的启动配置」，再移除插件。
+它会停止助手并删除自己创建的桌面和登录快捷方式，保留状态目录供手动清理。
+移除或关闭插件会停止 0.2.x 助手，但不会自动删除快捷方式文件。
 
 本地状态默认保存在 `%LOCALAPPDATA%\CodexUsageLens`，不写入插件缓存目录。
 `CODEX_HOME` 可指定日志主目录，命令行也支持 `--codex-home` 和 `--state-dir`。
+
+## 高级设置与排查
+
+需要 Node.js 22 及以上，启用时会寻找系统 Node 或 Codex 缓存的运行环境。
+配置解析器已经随插件打包，不需要用户执行 `npm install`。
+本地界面连接使用仅监听本机的 Chrome DevTools Protocol；启用时检测已有
+9229、9222、9230、9223 端口，专用启动器自动准备选定的连接。
+
+```powershell
+.\scripts\control.ps1 -Action Start
+.\scripts\control.ps1 -Action Status
+.\scripts\control.ps1 -Action Stop
+.\scripts\control.ps1 -Action Uninstall
+# 找不到客户端或需要指定端口时：
+.\scripts\control.ps1 -Action Start -CodexPath "C:\实际路径\Codex.exe" -Port 9229
+```
+
+`Stop` 只停止当前助手，登录恢复入口保留；需要移除自启时使用 `Uninstall`。
+运行代码在 `%LOCALAPPDATA%\CodexUsageLens\runtimes\<版本>`，启动入口在它的
+父目录，不依赖插件缓存是否被清理。本地诊断文件为 `status.json`、
+`launcher-status.json` 和 `helper.log`。
 
 ## 开发
 
 ```sh
 npm ci
 npm test
+npm run test:windows
 npx playwright install chromium
 npm run test:ui
 npm run demo
@@ -102,3 +138,4 @@ npm run demo
 
 演示和公开截图只使用合成数据。项目从零独立编写；Codex Monitor 仅作为效果
 参考，没有复制它的代码。完整英文说明见 [README.md](README.md)。
+用量图标和配置解析器的授权见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。

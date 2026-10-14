@@ -1,6 +1,6 @@
 {
   "name": "codex-usage-lens",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
   "description": "Local per-turn token usage buttons for Codex Desktop.",
   "type": "module",
@@ -12,7 +12,9 @@
     "status": "node src/cli.mjs status",
     "test": "node --test test/*.test.mjs",
     "test:ui": "node tools/test-ui.mjs",
-    "demo": "node tools/demo.mjs"
+    "demo": "node tools/demo.mjs",
+    "build:vendor": "node tools/build-vendor.mjs",
+    "test:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File tools/test-windows.ps1"
   },
-  "devDependencies": { "playwright": "1.62.1" }
+  "devDependencies": { "playwright": "1.62.1", "@iarna/toml": "2.2.5", "esbuild": "0.28.2", "ws": "8.22.0" }
 }
