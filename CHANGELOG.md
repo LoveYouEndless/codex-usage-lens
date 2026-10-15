@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.3.0 (Unreleased)
+
+- Add opt-in trusted Windows SessionStart and UserPromptSubmit hooks. They
+  deploy/upgrade once, restore one helper asynchronously, discard hook input,
+  and never reopen Codex or register startup entries. Trust remains a user choice.
+- Persist Stop across hooks, login recovery, launchers, and reboots; explicit
+  Start clears the pause. Serialize overlapping lifecycle requests and replace
+  outdated helper versions instead of spawning duplicates.
+- Discover Codex++'s actual debug port from local launcher status, with owned
+  Lens/default port fallbacks. Document Codex++, CC Switch, and direct desktop
+  launch behavior without assuming a CDP connection or covering CLI clients.
+- Retain explicit conversation activation for connection setup and clearing
+  pauses, without creating desktop or login startup shortcuts by default.
+- On explicit activation without a local connection, prepare a one-time reopen after the user
+  normally exits Codex within 15 minutes. Never terminate the client.
+- Cancel pending reopens on Stop, plugin disable, expiration, or a manually
+  reopened client. Repeated activation replaces the older request.
+- Keep shortcut and login setup explicitly opt-in, preserve existing 0.2.x
+  entries, and document full-exit/reboot limits without promising automatic
+  recovery from an ordinary launch.
+- Add independent login-recovery disable and status reporting. Login recovery
+  starts only the waiting helper; it never opens or restarts Codex. Verify that
+  a running helper mounts automatically when a usable connection appears.
+
 ## 0.2.0
 
 - Windows activation configures the helper, a stable dedicated launcher, and

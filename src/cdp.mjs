@@ -1,3 +1,7 @@
+import { join } from 'node:path';
+import { homedir } from 'node:os';
+import { readJSON, defaultState } from './state.mjs';
+
 const acceptedPorts = [9229, 9222, 9230, 9223];
 
 export async function targets(port) {
@@ -13,13 +17,21 @@ export async function targets(port) {
     && !/avatar-overlay|initialRoute=/i.test(item.url || ''));
 }
 
-export async function discover(port) {
-  for (const candidate of port ? [port] : acceptedPorts) {
+export async function discover(port, stateDir = defaultState()) {
+  let candidates = [port];
+  if (port === undefined) {
+    const plusRoot = process.env.CODEX_PLUS_STATE_DIR || join(homedir(), '.codex-session-delete');
+    const plus = await readJSON(join(plusRoot, 'latest-status.json')).catch(() => null);
+    const installation = await readJSON(join(stateDir, 'install.json')).catch(() => null);
+    candidates = [plus?.debug_port,
+      installation?.product === 'codex-usage-lens' ? installation.port : null, ...acceptedPorts];
+  }
+  for (const candidate of new Set(candidates.filter(value => Number.isInteger(value) && value >= 1 && value <= 65535))) {
     try {
       const pages = await targets(candidate);
       const page = pages.find(item => /^app:\/\/(?:-|codex)\/index\.html(?:[?#]|$)/.test(item.url || ''));
       if (page?.webSocketDebuggerUrl) return { port: candidate, page };
-    } catch { /* A closed port is normal when the client is not running. */ }
+    } catch { /* 客户端未运行时端口关闭属于正常情况。 */ }
   }
   throw new Error('No Codex desktop debug connection. Launch Codex with a loopback debugging port first.');
 }

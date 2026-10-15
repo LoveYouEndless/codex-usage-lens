@@ -27,6 +27,27 @@ async function cli(args) {
   const [code] = await once(child, 'exit');
   return { code, output };
 }
+test('status exposes a pending reopen and Stop cancels it even without a running helper', async () => {
+  const root = await mkdtemp(join(tmpdir(), 'lens-restart-'));
+  const args = ['--state-dir', root, '--codex-home', root];
+  const restartPath = join(root, 'restart-request.json');
+  try {
+    const request = {
+      state: 'waiting-for-exit', token: 'a'.repeat(32),
+      expiresAt: new Date(Date.now() + 60000).toISOString(), processes: [{ pid: 101 }]
+    };
+    await writeFile(restartPath, JSON.stringify(request));
+    const status = await cli(['status', ...args]);
+    assert.equal(status.code, 0);
+    assert.deepEqual(JSON.parse(status.output).restart, {
+      state: 'waiting-for-exit', expiresAt: request.expiresAt
+    });
+    assert.equal((await cli(['stop', ...args])).code, 0);
+    assert.equal((await readJSON(restartPath)).state, 'cancelled');
+    await writeFile(restartPath, JSON.stringify({ ...request, expiresAt: '2020-01-01T00:00:00Z' }));
+    assert.equal(JSON.parse((await cli(['status', ...args])).output).restart.state, 'expired');
+  } finally { await rm(root, { recursive: true, force: true }); }
+});
 test('helper exits on disabled config; resume respects it and re-enable starts a fresh helper', { timeout: 20000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), 'lens-lifecycle-'));
   const args = ['--state-dir', root, '--codex-home', root, '--port', '65432'];
@@ -53,6 +74,54 @@ test('helper exits on disabled config; resume respects it and re-enable starts a
       await Promise.race([once(worker, 'exit'), pause(2000)]);
       if (worker.exitCode === null) worker.kill();
     }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('Stop persists across automatic resumes and only explicit Start clears the pause', { timeout: 20000 }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'lens-pause-'));
+  const args = ['--state-dir', root, '--codex-home', root, '--port', '65432'];
+  try {
+    await writeFile(join(root, 'config.toml'), `[plugins."${defaultPluginId}"]\nenabled=true\n`);
+    assert.equal((await cli(['stop', ...args])).code, 0);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const resumed = await cli(['resume', ...args]);
+      assert.equal(resumed.code, 0);
+      assert.equal(JSON.parse(resumed.output).state, 'paused');
+      assert.equal(await controlRequest(root, 'ping'), false);
+    }
+    const status = JSON.parse((await cli(['status', ...args])).output);
+    assert.equal(status.paused, true);
+    assert.equal(status.state, 'paused');
+    assert.equal((await cli(['start', ...args])).code, 0);
+    assert.equal(await controlRequest(root, 'ping'), true);
+    assert.equal(JSON.parse((await cli(['status', ...args])).output).paused, false);
+  } finally {
+    await cli(['stop', ...args]);
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('overlapping resumes share one helper and replace an older runtime once', { timeout: 25000 }, async () => {
+  const root = await mkdtemp(join(tmpdir(), 'lens-overlap-'));
+  const args = ['--state-dir', root, '--codex-home', root, '--port', '65432'];
+  try {
+    await writeFile(join(root, 'config.toml'), `[plugins."${defaultPluginId}"]\nenabled=true\n`);
+    const results = await Promise.all(Array.from({ length: 4 }, () => cli(['resume', ...args])));
+    assert.ok(results.every(result => result.code === 0));
+    const control = await readJSON(join(root, 'control.json'));
+    const outputs = results.map(result => JSON.parse(result.output));
+    assert.equal(outputs.filter(item => item.state === 'already-running').length, 3);
+    assert.equal(outputs.find(item => item.pid)?.pid, control.pid);
+    await writeFile(join(root, 'control.json'), JSON.stringify({ ...control, version: '0.2.0' }));
+    assert.equal((await cli(['resume', ...args])).code, 0);
+    const replacement = await readJSON(join(root, 'control.json'));
+    assert.notEqual(replacement.pid, control.pid);
+    assert.equal(replacement.version, '0.3.0');
+    assert.equal(JSON.parse((await cli(['resume', ...args])).output).state, 'already-running');
+    assert.equal((await readJSON(join(root, 'control.json'))).pid, replacement.pid);
+  } finally {
+    await cli(['stop', ...args]);
     await rm(root, { recursive: true, force: true });
   }
 });

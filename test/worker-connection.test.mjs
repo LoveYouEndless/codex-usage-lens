@@ -18,7 +18,7 @@ async function waitUntil(check, limit = 10000) {
   while (Date.now() - start < limit) { if (await check()) return; await pause(80); }
   assert.fail('Mock connection condition did not become true.');
 }
-async function fixture() {
+async function fixture({ available = true } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'lens-connection-'));
   const configPath = join(root, 'config.toml');
   await writeFile(configPath, `[plugins."${defaultPluginId}"]\nenabled=true\n`);
@@ -31,14 +31,14 @@ async function fixture() {
       last_token_usage: { input_tokens: 100, output_tokens: 10, total_tokens: 110 }
     } } }
   ].map(item => JSON.stringify(item)).join('\n') + '\n');
-  const state = { target: 'renderer-1', supported: true, idle: false, displayed: false, injections: 0, removals: 0 };
+  const state = { available, target: 'renderer-1', supported: true, idle: false, displayed: false, injections: 0, removals: 0 };
   let port;
   const http = createServer((request, response) => {
     response.writeHead(200, { 'Content-Type': 'application/json' });
-    response.end(JSON.stringify([{
+    response.end(JSON.stringify(state.available ? [{
       id: state.target, type: 'page', url: 'app://-/index.html',
       webSocketDebuggerUrl: `ws://127.0.0.1:${port}/renderer`
-    }]));
+    }] : []));
   });
   const sockets = new WebSocketServer({ server: http });
   sockets.on('connection', socket => socket.on('message', bytes => {
@@ -75,6 +75,17 @@ async function fixture() {
     }
   };
 }
+
+test('a waiting helper mounts automatically when a usable client connection appears', { timeout: 15000 }, async () => {
+  const run = await fixture({ available: false });
+  try {
+    await waitUntil(async () => (await run.status())?.state === 'waiting');
+    assert.equal(run.state.injections, 0);
+    run.state.available = true;
+    await waitUntil(() => run.state.displayed);
+    await waitUntil(async () => (await run.status())?.state === 'connected');
+  } finally { await run.close(); }
+});
 
 test('disabling an active plugin removes injected UI before the helper exits', { timeout: 15000 }, async () => {
   const run = await fixture();
@@ -123,6 +134,6 @@ test('a loading or empty renderer waits and later displays statistics without a 
     assert.equal(run.state.injections, 0);
     run.state.idle = false;
     await waitUntil(() => run.state.displayed);
-    assert.equal((await run.status())?.state, 'connected');
+    await waitUntil(async () => (await run.status())?.state === 'connected');
   } finally { await run.close(); }
 });

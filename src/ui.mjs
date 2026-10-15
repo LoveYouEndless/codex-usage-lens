@@ -16,14 +16,14 @@ export function inspectPage() {
 
 export function removeLens() {
   const runtime = window.__codexUsageLens;
-  try { runtime?.destroy(); } catch { /* Remove owned nodes even if an old runtime fails to clean up. */ }
+  try { runtime?.destroy(); } catch { /* 旧运行时清理失败时，仍继续移除插件自己的节点。 */ }
   document.querySelectorAll('[data-usage-lens]').forEach(node => node.remove());
   document.querySelectorAll('[data-usage-lens-reply]').forEach(node => node.removeAttribute('data-usage-lens-reply'));
   return { removed: true };
 }
 
 export function installLens(payload) {
-  const VERSION = '0.2.0';
+  const VERSION = '0.3.0';
   const KEY = '__codexUsageLens';
   const ATTR = 'data-usage-lens';
   const active = () => {
@@ -338,7 +338,7 @@ export function installLens(payload) {
       if (!button) {
         button = make('button', 'ul-button');
         button.type = 'button';
-        // Lucide database icon; see THIRD_PARTY_NOTICES.md.
+        // 使用 Lucide 数据库图标，授权说明见 THIRD_PARTY_NOTICES.md。
         button.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>';
         button.append(make('span', 'ul-caption'));
         row.append(button);

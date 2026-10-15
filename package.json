@@ -1,6 +1,6 @@
 {
   "name": "codex-usage-lens",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "Local per-turn token usage buttons for Codex Desktop.",
   "type": "module",

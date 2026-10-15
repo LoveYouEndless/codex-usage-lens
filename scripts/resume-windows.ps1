@@ -1,13 +1,10 @@
-param([string]$StateDir)
+﻿param([string]$StateDir)
 $ErrorActionPreference = 'Stop'
 try {
     . (Join-Path $PSScriptRoot 'windows-common.ps1')
     if (-not $StateDir) { $StateDir = Get-LensStateDirectory }
-    $installation = Read-LensInstallation $StateDir
-    if (-not $installation) { exit }
-    $nodeRuntime = Find-LensNode $installation.nodePath
-    if (Read-LensPolicy $installation $nodeRuntime) { Start-LensHelper $installation $nodeRuntime }
+    Invoke-LensLogin $StateDir
 } catch {
-    # Login recovery is optional and must not interrupt normal desktop startup.
+    # 登录恢复是可选功能，失败时不影响正常进入桌面。
     exit
 }

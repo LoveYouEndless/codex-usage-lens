@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, rename, access } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { resolve, join } from 'node:path';
 
@@ -43,6 +43,11 @@ export async function atomicJSON(path, value) {
 }
 
 export async function ensureState(directory) { await mkdir(directory, { recursive: true, mode: 0o700 }); }
+
+export async function isPaused(directory) {
+  try { await access(join(directory, 'paused')); return true; }
+  catch (error) { if (error.code === 'ENOENT') return false; throw error; }
+}
 
 export async function controlRequest(directory, route) {
   const control = await readJSON(join(directory, 'control.json'));

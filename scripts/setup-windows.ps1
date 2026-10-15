@@ -1,11 +1,13 @@
-param(
+﻿param(
     [string]$StateDir,
     [string]$CodexHome,
     [string]$CodexPath,
     [string]$NodePath,
     [int]$Port = 0,
     [string]$DesktopDirectory,
-    [string]$StartupDirectory
+    [string]$StartupDirectory,
+    [switch]$DesktopShortcut,
+    [switch]$LoginRecovery
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'windows-common.ps1')
@@ -45,7 +47,7 @@ if ($version -notmatch '^\d+\.\d+\.\d+$') { throw 'Invalid plugin version.' }
 New-Item -ItemType Directory -Path $StateDir -Force | Out-Null
 $runtime = Join-Path $StateDir "runtimes\$version"
 New-Item -ItemType Directory -Path $runtime -Force | Out-Null
-# Copy only shipped code; never copy .git, state, logs, or conversation data.
+# 仅部署随插件提供的代码，不复制仓库信息、运行状态、日志或会话数据。
 foreach ($folder in @('src', 'vendor')) {
     $destination = Join-Path $runtime $folder
     New-Item -ItemType Directory -Path $destination -Force | Out-Null
@@ -54,7 +56,7 @@ foreach ($folder in @('src', 'vendor')) {
     }
 }
 Copy-Item -LiteralPath (Join-Path $pluginRoot 'package.json') -Destination (Join-Path $runtime 'package.json') -Force
-foreach ($entry in @('windows-common.ps1', 'launcher-windows.ps1', 'resume-windows.ps1')) {
+foreach ($entry in @('windows-common.ps1', 'launcher-windows.ps1', 'resume-windows.ps1', 'restart-windows.ps1')) {
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot $entry) -Destination (Join-Path $StateDir $entry) -Force
 }
 if (-not $DesktopDirectory) { $DesktopDirectory = [Environment]::GetFolderPath('Desktop') }
@@ -83,21 +85,33 @@ function Save-LensShortcut([string]$Directory, [string]$Name, [string]$Entry, [s
 }
 $installation = [ordered]@{
     product = 'codex-usage-lens'; version = $version
-    stateDir = $StateDir; runtimePath = $runtime; codexHome = $CodexHome
+    stateDir = $StateDir; runtimePath = $runtime; codexHome = $CodexHome; pluginRoot = $pluginRoot
     pluginId = $pluginId; nodePath = $node; port = $Port
     codexPath = $(if ($application) { $application.Path } else { $null })
     desktopShortcut = (Join-Path $DesktopDirectory 'Codex Usage Lens.lnk')
     startupShortcut = (Join-Path $StartupDirectory 'Codex Usage Lens startup.lnk')
-    desktopInstalled = $false; loginRecovery = $false
+    desktopInstalled = [bool]($previous -and $previous.desktopInstalled)
+    loginRecovery = [bool]($previous -and $previous.loginRecovery)
 }
-# Persist the pointer before shortcuts become usable.
+if ($previous) {
+    if (-not $DesktopShortcut -and $previous.desktopShortcut) { $installation.desktopShortcut = $previous.desktopShortcut }
+    if (-not $LoginRecovery -and $previous.startupShortcut) { $installation.startupShortcut = $previous.startupShortcut }
+}
+# 先保存运行目录，确保快捷方式创建后能找到已部署的代码。
 $installPath = Join-Path $StateDir 'install.json'
 [IO.File]::WriteAllText($installPath, ($installation | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
-try {
-    $installation.desktopInstalled = Save-LensShortcut $DesktopDirectory 'Codex Usage Lens.lnk' 'launcher-windows.ps1' 'Open Codex with optional Usage Lens statistics'
-} catch { Write-Warning 'Could not create the dedicated desktop shortcut. The original Codex shortcut is unchanged.' }
-try {
-    $installation.loginRecovery = Save-LensShortcut $StartupDirectory 'Codex Usage Lens startup.lnk' 'resume-windows.ps1' 'Restore Usage Lens at login without opening Codex'
-} catch { Write-Warning 'Login recovery could not be registered; manual activation remains available.' }
+if ($DesktopShortcut) {
+    try {
+        $installation.desktopInstalled = Save-LensShortcut $DesktopDirectory 'Codex Usage Lens.lnk' 'launcher-windows.ps1' 'Open Codex with Usage Lens statistics'
+    } catch { Write-Warning 'Could not create the dedicated desktop shortcut. The original Codex shortcut is unchanged.' }
+}
+if ($LoginRecovery) {
+    try {
+        $registered = Save-LensShortcut $StartupDirectory 'Codex Usage Lens startup.lnk' 'resume-windows.ps1' 'Restore Usage Lens at login without opening Codex'
+        if ($registered) {
+            $installation.loginRecovery = $true
+        }
+    } catch { Write-Warning 'Login recovery could not be registered; manual activation remains available.' }
+}
 [IO.File]::WriteAllText($installPath, ($installation | ConvertTo-Json), [Text.UTF8Encoding]::new($false))
 $installation | ConvertTo-Json

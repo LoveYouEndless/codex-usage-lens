@@ -1,0 +1,23 @@
+{
+  "description": "Restore the local Windows usage helper after the user trusts these hooks. No client restart or login registration.",
+  "hooks": {
+    "SessionStart": [{
+      "hooks": [{
+        "type": "command",
+        "command": "true",
+        "commandWindows": "powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File \"${PLUGIN_ROOT}/scripts/hook-windows.ps1\"",
+        "async": true,
+        "timeout": 60
+      }]
+    }],
+    "UserPromptSubmit": [{
+      "hooks": [{
+        "type": "command",
+        "command": "true",
+        "commandWindows": "powershell.exe -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File \"${PLUGIN_ROOT}/scripts/hook-windows.ps1\"",
+        "async": true,
+        "timeout": 60
+      }]
+    }]
+  }
+}

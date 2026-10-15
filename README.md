@@ -18,28 +18,57 @@ In Codex, open **Plugins → Add marketplace**, and enter:
 https://github.com/LoveYouEndless/codex-usage-lens
 ```
 
-Install **Codex Usage Lens**, then ask:
+1. Install and enable **Codex Usage Lens**.
+2. Review the plugin hooks in Codex and decide whether to trust them.
+3. Start/resume a conversation or send a message. The helper prepares itself
+   automatically and displays usage buttons when a usable connection exists.
+
+Normal use needs no terminal commands or Lens API key. Setup adds no desktop
+shortcuts or login entries by default.
+
+If buttons do not appear initially, or you previously stopped monitoring,
+select `@Codex Usage Lens` in a conversation and send:
 
 ```text
-Start Codex Usage Lens.
+@Codex Usage Lens Start usage monitoring.
 ```
 
-On Windows, activation automatically prepares the local helper, a **Codex Usage
-Lens** desktop shortcut, and login recovery. No API key or terminal commands are
-needed in the normal installation flow.
+If prompted that a one-time reopen is ready, finish your current work, then
+**fully quit Codex within 15 minutes** and wait for it to reopen automatically.
+Continue using Codex normally.
 
-If activation says a first-time reopen is needed, finish active work, close
-Codex normally, and use the new shortcut. An existing compatible launcher works
-without this additional step. Use the dedicated shortcut for future launches;
-the original shortcut remains available and unchanged.
+See below for recovery after restarts and differences between launch methods.
 
 ## Restart And Upgrade Behavior
 
+Automatic recovery requires the user to trust the hooks in Codex. Lens never
+writes trust records or confirms that choice for the user. On Windows,
+`SessionStart` handles new/resumed sessions and `UserPromptSubmit` provides
+recovery when submitting a message. Both run asynchronously and reuse one helper.
+Opening the app solely to browse past replies does not guarantee a hook fired.
+CLI clients are out of scope.
+
+| Desktop launch | After trusting the hooks |
+| --- | --- |
+| Codex++, API key or official login | Restore the helper and display buttons when a usable CDP connection exists; discover the launcher's actual port |
+| Launch after configuring CC Switch | Restore the helper; display buttons with a connection, otherwise wait |
+| Direct Codex launch | Restore the helper; wait when an ordinary launch lacks a connection |
+
+Hooks never arm a client reopen. Explicit activation can prepare one when no
+connection exists; it does not permanently change ordinary launch arguments.
+Stop, disabling the plugin, expiration, or detecting a manual reopen cancels
+a pending reopen.
+
 | Scenario | Behavior |
 | --- | --- |
-| First activation | Detect the runtime, deploy stable helper code, and register dedicated shortcuts |
-| Codex restart | Reconnect when Codex is opened through Lens or another compatible launcher |
-| Computer restart | Restore the helper after login and wait; do not open Codex automatically |
+| Trusted session start/resume or message submission | Deploy/upgrade once, then reuse the running helper |
+| Hook without a usable connection | Keep waiting; never arm a client reopen |
+| Explicit activation without a usable connection | Wait up to 15 minutes for normal exit, then reopen once |
+| Renderer reload or compatible client restart | The running helper reconnects |
+| Full exit and ordinary launch | Session hooks restore the helper; explicitly prepare a reopen if no connection exists |
+| Computer restart | Restore the unpaused helper at the next session hook |
+| Stop | Persist a pause, cancel pending reopens, remove statistics, and stop; hooks cannot revive it |
+| Reopen timeout | Cancel only the pending reopen; keep waiting for a usable connection |
 | Plugin disabled | Withdraw statistics and exit; no config files are edited |
 | Codex upgrade | Discover the new installed executable instead of retaining a version-specific shortcut |
 | Incompatible UI | Pause injection for the affected renderer; continue using Codex normally |
@@ -54,15 +83,34 @@ enabled = true
 Setting it to `false` stops the running helper at its next policy check.
 Missing/uninstalled plugin entries also stop it. Temporarily invalid TOML pauses
 statistics without quoting settings into logs. Re-enabling takes effect on the
-next activation, dedicated launch, or login. Recovery registration alone cannot
-enable an app launched without a usable local connection.
+next trusted hook, unless explicitly paused; use Start to clear that pause.
+Dedicated shortcuts and login recovery are explicit advanced
+options; recovery registration alone cannot enable a client launched without a
+usable local connection.
+
+### Optional Background Waiting
+
+The running helper already waits for usable local connections and mounts the
+buttons when one appears. Detecting a Codex process alone does not grant an
+injection connection; another process watcher or Windows service cannot replace
+that prerequisite.
+
+Users can explicitly opt into helper recovery after Windows login. This starts
+only the helper: it never opens or restarts Codex and does not install a Windows
+service. An ordinary launch without a usable connection still requires
+conversation activation and the requested one-time reopen. This option is not
+a promise of automatic button recovery after every reboot, and is off by default.
+Ask to enable or disable helper recovery at login, or use the advanced commands
+below to configure it yourself.
 
 Lens runs separately from Codex. The dedicated launcher falls back to ordinary
 startup on missing Node, unavailable configuration, or a busy debug port. If
 debug launch throws or the client exits immediately, it tries ordinary startup
 once. It never terminates Codex or alters installed client files. Unknown future
-client changes cannot be guaranteed compatible; keep the original shortcut as
-a direct fallback. Updating Lens and activating it once resumes updated code.
+client changes cannot be guaranteed compatible. Normal Codex launch remains
+available. The next trusted hook or explicit activation deploys an updated Lens.
+Changed hook definitions require the user to review and trust them again. Completing
+the one-time reopen does not by itself prove that buttons are visible.
 
 ## Controls
 
@@ -75,7 +123,7 @@ a direct fallback. Updating Lens and activating it once resumes updated code.
 - Select Auto, Raw, K, or M for display units.
 - Enable **Show session meter** in the panel for a draggable floating total.
 - Meter details remain open during usage refreshes and stay next to the meter.
-- Ask **Stop Codex Usage Lens** to remove the UI and stop its helper.
+- Ask **Stop Codex Usage Lens** to remove the UI and persist a pause; explicitly start to resume.
 
 The interface uses Chinese for `zh` locales, and English otherwise.
 
@@ -97,25 +145,35 @@ Windows and `$CODEX_HOME/usage-lens` (or `~/.codex/usage-lens`) elsewhere.
 
 Node.js 22 or newer is required. Windows activation discovers system Node or
 Codex's cached runtime. The TOML parser is bundled; users do not run `npm install`.
-The renderer connection uses loopback Chrome DevTools Protocol. Existing ports
-9229, 9222, 9230, and 9223 are detected at setup; the dedicated launcher prepares
-the selected connection automatically.
+The renderer connection uses loopback Chrome DevTools Protocol. Automatic recovery
+checks Codex++'s `latest-status.json` (honoring `CODEX_PLUS_STATE_DIR`), the installed
+Lens port, and ports 9229, 9222, 9230, and 9223. Status files are hints only; the
+endpoint must expose a Codex main page. An explicit port is exclusive.
+The one-time reopen prepares the selected connection automatically.
 
 ```powershell
 .\scripts\control.ps1 -Action Start
 .\scripts\control.ps1 -Action Status
 .\scripts\control.ps1 -Action Stop
 .\scripts\control.ps1 -Action Uninstall
+# Only when these extra entries are explicitly wanted:
+.\scripts\control.ps1 -Action Setup -DesktopShortcut
+.\scripts\control.ps1 -Action Setup -LoginRecovery
+.\scripts\control.ps1 -Action DisableLoginRecovery
 # Troubleshooting only:
 .\scripts\control.ps1 -Action Start -CodexPath "C:\path\to\Codex.exe" -Port 9229
 ```
 
-`Stop` affects the current helper. Login recovery stays registered until
-`Uninstall`, and resumes only while the Codex plugin remains enabled. Runtime
+`Stop` persists a pause and cancels a pending reopen. Hooks, login recovery, and
+the dedicated launcher respect it; only explicit `Start` clears it. Previously opted-in
+login recovery stays registered until `DisableLoginRecovery` or `Uninstall`,
+and resumes only while the Codex plugin remains enabled. Disabling recovery
+does not stop the current monitor. Runtime
 code is installed into `%LOCALAPPDATA%\CodexUsageLens\runtimes\<version>`, with
 stable launcher scripts and `install.json` beside it. Plugin-cache deletion
 does not invalidate the login entry. Launcher and helper diagnostics are local
-`launcher-status.json`, `status.json`, and `helper.log`.
+`launcher-status.json`, `restart-request.json`, `status.json`, `hook-status.json`
+(recovery failures), and `helper.log`. The `paused` file stores the pause.
 
 ## What The Numbers Mean
 
@@ -139,8 +197,10 @@ cumulative session totals are not summed together.
 
 ## Compatibility And Privacy
 
-- Windows is the first supported setup path. The core runtime is portable, but
-  macOS/Linux launcher setup has not been validated.
+- Automatic hooks currently target Windows Desktop. macOS/Linux hook commands
+  are no-ops; their launcher setup has not been validated.
+- The client must load trusted plugin hooks. A running helper is not evidence
+  that hooks are trusted or usage buttons are visible.
 - The UI currently targets desktop builds exposing response annotation message
   IDs and assistant action timestamps. It does not inject into browser ChatGPT.
 - Only local UUID sessions with matching log metadata are supported. Remote
@@ -153,7 +213,8 @@ cumulative session totals are not summed together.
   official native footer extension. App DOM/log changes can require an update.
 - Runtime operation sends no data to remote servers. Logs are read locally;
   only counters, session/turn/message IDs, model names, and timestamps are
-  transferred to the local renderer. Conversation bodies are not retained or
+  transferred to the local renderer. Hook input is discarded without parsing,
+  retaining, logging, or interpolating user messages. Conversation bodies are not retained or
   transferred by Lens. No Codex installation files or session logs are written.
 - A debugging port allows local software to control the renderer. Keep it
   bound to loopback; do not expose or forward it to a network.
@@ -161,8 +222,10 @@ cumulative session totals are not summed together.
 To uninstall, ask **Uninstall Codex Usage Lens startup configuration** before
 removing the plugin, or run `control.ps1 -Action Uninstall`. It removes only its
 owned desktop/login shortcuts and stops the helper. It leaves local state/code
-for optional manual cleanup. Removing or disabling the Codex plugin stops a
-running 0.2.x helper but does not itself delete the shortcut files.
+for optional manual cleanup. Existing 0.2.x shortcuts and login entries are
+preserved on upgrade rather than silently removed. Use Uninstall to remove
+those old entries, then activate the new version; default activation will not
+recreate them.
 
 ## Development
 

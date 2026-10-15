@@ -14,4 +14,16 @@ test('marketplace resolves to the actual installable plugin and skill', async ()
   assert.equal(manifest.name, marketplace.plugins[0].name);
   assert.equal(manifest.license, 'MIT');
   assert.ok((await stat(join(root, manifest.skills, 'usage-lens', 'SKILL.md'))).isFile());
+  const hooks = JSON.parse(await readFile(join(root, manifest.hooks), 'utf8'));
+  assert.deepEqual(Object.keys(hooks.hooks), ['SessionStart', 'UserPromptSubmit']);
+  for (const groups of Object.values(hooks.hooks)) {
+    assert.equal(groups.length, 1);
+    const [handler] = groups[0].hooks;
+    assert.equal(handler.type, 'command');
+    assert.equal(handler.async, true);
+    assert.equal(handler.command, 'true');
+    assert.match(handler.commandWindows, /-File "\$\{PLUGIN_ROOT\}\/scripts\/hook-windows\.ps1"/);
+    assert.ok(handler.timeout >= 30);
+  }
+  assert.ok((await stat(join(root, 'scripts', 'hook-windows.ps1'))).isFile());
 });

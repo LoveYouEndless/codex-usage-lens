@@ -5,7 +5,7 @@ import { unlink } from 'node:fs/promises';
 import { SessionStore } from './logs.mjs';
 import { CDP, discover } from './cdp.mjs';
 import { installLens, inspectPage, removeLens } from './ui.mjs';
-import { options, ensureState, atomicJSON, readJSON } from './state.mjs';
+import { options, ensureState, atomicJSON, readJSON, isPaused } from './state.mjs';
 import { readPolicy } from './policy.mjs';
 import { probePage, CompatibilityGuard } from './compatibility.mjs';
 
@@ -23,7 +23,7 @@ const guard = new CompatibilityGuard();
 const statusPath = join(config.stateDir, 'status.json');
 const controlPath = join(config.stateDir, 'control.json');
 const status = async value => atomicJSON(statusPath, {
-  product: 'codex-usage-lens', version: '0.2.0', pid: process.pid,
+  product: 'codex-usage-lens', version: '0.3.0', pid: process.pid,
   updatedAt: new Date().toISOString(), ...value
 });
 
@@ -44,12 +44,19 @@ const server = createServer((request, response) => {
 server.requestTimeout = 3000;
 server.headersTimeout = 3000;
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-await atomicJSON(controlPath, { pid: process.pid, port: server.address().port, token });
+await atomicJSON(controlPath, {
+  pid: process.pid, port: server.address().port, token, version: '0.3.0',
+  codexHome: config.codexHome, debugPort: config.port || null
+});
 
 async function tick() {
   if (stopping) return;
   let delay = 2000;
   try {
+    if (await isPaused(config.stateDir)) {
+      setTimeout(() => void shutdown('paused'), 0);
+      return;
+    }
     const policy = await readPolicy(config.codexHome, config.pluginId);
     if (!policy.enabled) {
       await clearUI();
@@ -61,7 +68,7 @@ async function tick() {
       return;
     }
     if (!client) {
-      const found = await discover(config.port);
+      const found = await discover(config.port, config.stateDir);
       connectedPort = found.port;
       targetId = found.page.id;
       if (guard.blocked(targetId)) {
@@ -120,14 +127,14 @@ async function tick() {
 
 async function clearUI() {
   try { if (client) await client.evaluate(`(${removeLens.toString()})()`); }
-  catch { /* Never restart or terminate Codex to remove temporary UI. */ }
+  catch { /* 清理临时界面失败时，不重开或终止 Codex。 */ }
 }
 
 async function shutdown(finalState = 'stopped') {
   if (stopping) return;
   stopping = true;
   clearTimeout(timer);
-  // Finish an in-flight injection before removing the UI.
+  // 等待正在执行的注入结束，再清理界面，避免停止后重新出现统计。
   await tickPromise?.catch(() => {});
   await clearUI();
   client?.close();
